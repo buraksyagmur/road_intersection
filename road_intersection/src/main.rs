@@ -67,6 +67,7 @@ async fn main() {
     let mut  newspan = Spawn::ALLGREEN;// Initialize the traffic light pattern
     let mut all_traffic_lights : Vec<TrafficLight> = vec![];// Create an empty vector to store all traffic lights
 
+    let mut break_flag = false;
 
     lights.push(GREEN);// Add the green color to the top left trafic lights
     lights.push(GREEN);// Add the green color to the top right trafic lights
@@ -194,20 +195,31 @@ async fn main() {
                 onecar.drive_car();
 
         }
+        //condition to check if the 'Esc' key is pressed:
+        if is_key_pressed(KeyCode::Escape) {
+            break_flag = true;
+            break;
+        }
 
-        next_frame().await
+        next_frame().await;
     }
+    //This condition checks if the break_flag is true, and break the main function as (ESCAPE):
+    if break_flag {
+        return;
+    }
+    
+    next_frame().await
 }
 
 fn road(){
     let screen_width = screen_width();
     let screen_height = screen_height();
+    
     {
         // center -> up
         draw_line(620.0, 0.0, 620.0, 420.0, 1.0, YELLOW);//top left line
         draw_line(700.0, 0.0, 700.0, 420.0, 1.0, WHITE);//top middle line
         draw_line(780.0, 0.0, 780.0, 420.0, 1.0, YELLOW);// top right line
-
     }
    
     {
@@ -215,13 +227,15 @@ fn road(){
         draw_line(620.0, 580.0, 620.0, screen_height, 1.0, RED);//bottom left line
         draw_line(700.0, 580.0, 700.0, screen_height, 1.0, WHITE);//bottom middle line
         draw_line(780.0, 580.0, 780.0, screen_height, 1.0, RED);// bottom right line
-    }
+    }    
+    
     {
         // center -> left
         draw_line(0.0, 420.0, 620.0, 420.0, 1.0, BLUE);//upper-left line
         draw_line(0.0, 500.0, 620.0, 500.0, 1.0, WHITE);//middle-left line
         draw_line(0.0, 580.0, 620.0, 580.0, 1.0, BLUE);//bottom-left line
     }
+
     {
         // center -> right
         draw_line(780.0, 420.0, screen_width, 420.0, 1.0, GREEN);// upper-right line
@@ -231,14 +245,14 @@ fn road(){
     {
         //  draw a rectangle for the road color (top to bottom)
         draw_rectangle(620.0, 0.0, 780.0 - 620.0, screen_height, Color::new(0.0, 0.4, 0.4, 0.2)); //top to bottom road color
-       //  draw a rectangle for the road color (sideways)
-       draw_rectangle(0.0, 580.0, screen_width, 460.0 - 620.0, Color::new(0.0, 0.4, 0.4, 0.2)); //left to left road color
+        //  draw a rectangle for the road color (sideways)
+        draw_rectangle(0.0, 580.0, screen_width, 460.0 - 620.0, Color::new(0.0, 0.4, 0.4, 0.2)); //left to left road color
     }
 }
 
 // Define a struct named "Car"
 impl Car {
-
+    
     // Define a new constructor function for the "Car" struct
     pub fn new(spawninglocation:Spawn, car_id:u64 ) -> Car {
         // Create a new random number generator
@@ -254,17 +268,17 @@ impl Car {
             // This branch should never be reached, but it's included to make the compiler happy
             _ => { Colour::GREEN }
         };
-
+        
         // Define a variable named "color"
         let color: Color;
-
+        
         // Set the "color" variable based on the selected color
         match selected_colour {
             Colour::RED  => {color = RED}
             Colour::BLUE  => {color = BLUE}
             Colour::GREEN  => {color = GREEN}
         }
-
+        
         // Define a variable named "direction"
         let direction = match selected_colour {
             // If the selected color is red, set the direction to left
@@ -274,7 +288,7 @@ impl Car {
             // If the selected color is green, set the direction to straight
             Colour::GREEN  => {Direction::STRAIGHT}
         };
-
+        
         // Define variables named "x" and "y" (WHICH IS USED TO KEEP THE CAR IN THE CENTRE OF THE ROAD)
         let (x, y) = match spawninglocation {
             // If the spawning location is north, set the x and y coordinates accordingly
@@ -288,7 +302,7 @@ impl Car {
             // If the spawning location is all green, set the x and y coordinates to (0, 0)
             Spawn::ALLGREEN => (0.0, 0.0)
         };
-
+        
         // Create a new Car object with the given properties
         let xnewcar = Car {
             id : car_id,
@@ -302,10 +316,10 @@ impl Car {
             newdirection: Spawn::EAST,
             wait:false,
         };
-
+        
         // Print the new car's properties for debugging purposes
         println!("{:?}", xnewcar);
-
+        
         // Return the new car object
         return xnewcar;
 
@@ -318,26 +332,25 @@ impl Car {
         //     position: CarPosition{x,y},
         //     color,
         // }
-
     }
-
-
+    
     fn drive_car(&mut self) {
-        
+            
         // Draw rectangle using the car's position, width, height, and color
         draw_rectangle(self.position.x, self.position.y, self.width, self.height, self.color);
+            
         // println!("drawcar: {},{},{},{},{:?}", self.position.x, self.position.y, self.width, self.height, self.color);
         // self.turn();
-        
+            
         // Check if the car is waiting at a specific location before moving
         if self.wait && self.spawninglocation == Spawn::EAST && self.position.x == 540.00 {
             // Do nothing if the car is waiting at this location
         } else if self.wait && self.spawninglocation == Spawn::WEST && self.position.x == 780.00 {
             // Do nothing if the car is waiting at this location
         } else if self.wait && self.spawninglocation == Spawn::NORTH && self.position.y == 340.00 {
-            // Do nothing if the car is waiting at this location
+           // Do nothing if the car is waiting at this location
         } else if self.wait && self.spawninglocation == Spawn::SOUTH && self.position.y == 580.00 {
-            // Do nothing if the car is waiting at this location
+          // Do nothing if the car is waiting at this location
         } else {
             // Move the car based on its spawning location, position, and color
             if self.spawninglocation == Spawn::EAST {
@@ -366,11 +379,13 @@ impl Car {
                 // Move the car to the left
                 self.position.x -= 10.0;
             }
+            
             if self.spawninglocation == Spawn::NORTH {
                 if self.position.x == 620.0 && self.position.y == 499.0 && !self.passed_intersection && self.color == RED {
                     // Update the car's spawning location and passed intersection flag
                     self.passed_intersection = true;
                     self.spawninglocation = Spawn::EAST;
+                
                 } else if self.position.x == 620.0 && self.position.y == 419.0 && !self.passed_intersection && self.color == BLUE {
                     // Update the car's spawning location and passed intersection flag
                     self.spawninglocation = Spawn::WEST;
@@ -379,6 +394,7 @@ impl Car {
                 // Move the car up
                 self.position.y += 10.0;
             }
+            
             if self.spawninglocation == Spawn::SOUTH {
                 // Check if the car is at the intersection, has not passed it, and has the correct color.
                 if self.position.x==700.0 && self.position.y == 421.0 && !self.passed_intersection && self.color == RED{
@@ -400,27 +416,25 @@ impl Car {
 // This function updates the traffic lights and returns a tuple with the index of 
 // the next car to be processed and the current spawning location.
 fn trafficlights(all_cars: &mut Vec<Car>,mut checkcar: usize) -> (usize, Spawn){
-    
     // Print the length of the all_cars vector and the index of the current car being processed.
     println!("allcar len: {}, checkcar: {}",all_cars.len(), checkcar);
-    
+        
     // Print the current car being processed.
     println!("{:?}",all_cars[checkcar]);
-
+        
     // If the current car has passed the intersection, move to the next car and set the 
     // traffic lights to all green.
     if all_cars[checkcar].passed_intersection == true {
         checkcar+=1 as usize;
         (checkcar, Spawn::ALLGREEN)
-
     }else {
-
+        
         // Otherwise, set the traffic lights according to the current car's spawning location.
         draw_circle(590.0, 590.0, 10.0, RED);
         draw_circle(820.0, 390.0, 10.0, RED);
         draw_circle(810.0, 605.0, 10.0, RED);
         draw_circle(590.0, 390.0, 10.0, RED);
-        
+            
         match all_cars[checkcar].spawninglocation  {
             Spawn::NORTH => {draw_circle(590.0, 390.0, 10.0, GREEN)},
             Spawn::SOUTH=> {draw_circle(810.0, 605.0, 10.0, GREEN)},
@@ -432,9 +446,10 @@ fn trafficlights(all_cars: &mut Vec<Car>,mut checkcar: usize) -> (usize, Spawn){
                 draw_circle(190.0, 100.0, 10.0, GREEN)
             },
         };
+            
         //    checkcar +=1 as  usize;
         // Return the index of the current car and the current spawning location.
         (checkcar, all_cars[checkcar].spawninglocation.clone())
-    }
+    }   
 }
 
