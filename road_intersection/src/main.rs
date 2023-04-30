@@ -123,6 +123,20 @@ async fn main() {
                 // Increment the car ID
                 car_id +=1 as u64;
             };
+
+            // implementing the 'r' key for spawning a vehicle from a random direction.
+            if key == R {
+                let mut rng = thread_rng();
+                let random_direction = rng.gen_range(0..4);
+                let spawn_location = match random_direction {
+                    0 => Spawn::NORTH,
+                    1 => Spawn::WEST,
+                    2 => Spawn::SOUTH,
+                    _ => Spawn::EAST,
+                };
+                all_cars.push(Car::new(spawn_location, car_id as u64));
+                car_id += 1 as u64;
+            }
         }
          
         // Draw traffic lights
