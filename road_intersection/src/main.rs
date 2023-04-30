@@ -124,7 +124,7 @@ async fn main() {
                 car_id +=1 as u64;
             };
         }
-        
+         
         // Draw traffic lights
         
         // Draw the traffic light for the west direction (LEFT DRIVERS)
