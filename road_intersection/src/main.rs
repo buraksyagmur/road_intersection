@@ -81,7 +81,7 @@ async fn main() {
     lights.push(GREEN);// Add the green color to the bottom left trafic lights
 
     loop {
-        // Clear the background with a green color
+        // Clear the background with a DARKBROWN color
         clear_background(DARKBROWN);
         
         // Get the mouse position
@@ -95,8 +95,13 @@ async fn main() {
         
         road();// Draw the road
 
+        // Draw direction labels
+        draw_text("NORTH", 667.0, 50.0, 30.0, BLACK);
+        draw_text("SOUTH", 667.0, 750.0, 30.0, BLACK);
+        draw_text("WEST", 50.0, 506.0, 30.0, BLACK);
+        draw_text("EAST", 1200.0, 506.0, 30.0, BLACK);
 
-        
+
         //  draw_rectangle(position.x, 420.0, 80.0, 80.0, YELLOW);
 
         // Check for user input and spawn cars ensure that the minimum time between spawns is 0.5 seconds
