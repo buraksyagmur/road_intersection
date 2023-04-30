@@ -69,6 +69,12 @@ async fn main() {
 
     let mut break_flag = false;
 
+    //This is a new variable to store the time of the last spawn:
+    let mut last_spawn_time = get_time();
+
+    // Here we create a threshold for the minimum time between spawns (to 0.5 seconds):
+    let spawn_throttle_time = 0.5;
+
     lights.push(GREEN);// Add the green color to the top left trafic lights
     lights.push(GREEN);// Add the green color to the top right trafic lights
     lights.push(GREEN);//  Add the green color to the bottom right trafic lights
@@ -80,8 +86,10 @@ async fn main() {
         
         // Get the mouse position
         let (mouse_x, mouse_y) = mouse_position();
+
         // Draw the mouse position text
         draw_text(format!("X: {}, Y:{}", mouse_x, mouse_y).as_str(), mouse_x, mouse_y, 25.0, BLACK);
+        
         // Draw the mouse position text
         draw_text(format!("X: {}, Y:{}", mouse_x, mouse_y).as_str(), 0.0, 0.0, 25.0, BLACK);
         
@@ -90,53 +98,82 @@ async fn main() {
 
         
         //  draw_rectangle(position.x, 420.0, 80.0, 80.0, YELLOW);
-        // Check for user input and spawn cars
-        // Check if a key has been pressed
-        if let Some(key) = get_last_key_pressed() {
-            // Check if the up arrow has been pressed
-            if key == Up {
-                // Add a new car coming from the north
-                all_cars.push(Car::new(Spawn::NORTH,  car_id as u64));
-                // Increment the car ID
-                car_id +=1 as u64;
-            };
 
-            // Check if the down arrow has been pressed
-            if key == Down {
-                // Add a new car coming from the south
-                all_cars.push(Car::new(Spawn::SOUTH,  car_id as u64));
-                // Increment the car ID
-                car_id +=1 as u64;
-            };
+        // Check for user input and spawn cars ensure that the minimum time between spawns is 0.5 seconds
+        //preventing spamming the creation of vehicles.
+        if get_time() - last_spawn_time >= spawn_throttle_time {
+            if let Some(key) = get_last_key_pressed() {
 
-            // Check if the right arrow has been pressed
-            if key == Right {
-                // Add a new car coming from the west
-                all_cars.push(Car::new(Spawn::WEST,  car_id as u64));
-                // Increment the car ID
-                car_id +=1 as u64;
-            };
+                // Check if the up arrow has been pressed
+                if key == Up {
 
-            // Check if the left arrow has been pressed
-            if key == Left {
-                // Add a new car coming from the east
-                all_cars.push(Car::new(Spawn::EAST,  car_id as u64));
-                // Increment the car ID
-                car_id +=1 as u64;
-            };
+                    // Add a new car coming from the north
+                    all_cars.push(Car::new(Spawn::NORTH,  car_id as u64));
 
-            // implementing the 'r' key for spawning a vehicle from a random direction.
-            if key == R {
-                let mut rng = thread_rng();
-                let random_direction = rng.gen_range(0..4);
-                let spawn_location = match random_direction {
-                    0 => Spawn::NORTH,
-                    1 => Spawn::WEST,
-                    2 => Spawn::SOUTH,
-                    _ => Spawn::EAST,
+                    // Increment the car ID
+                    car_id +=1 as u64;
+                    
+                    // geting the spawn time
+                    last_spawn_time = get_time();
                 };
-                all_cars.push(Car::new(spawn_location, car_id as u64));
-                car_id += 1 as u64;
+
+                // Check if the down arrow has been pressed
+                if key == Down {
+
+                    // Add a new car coming from the south
+                    all_cars.push(Car::new(Spawn::SOUTH,  car_id as u64));
+
+                    // Increment the car ID
+                    car_id +=1 as u64;
+
+                    // geting the spawn time
+                    last_spawn_time = get_time();
+                };
+
+                // Check if the right arrow has been pressed
+                if key == Right {
+
+                    // Add a new car coming from the west
+                    all_cars.push(Car::new(Spawn::WEST,  car_id as u64));
+
+                    // Increment the car ID
+                    car_id +=1 as u64;
+
+                    // geting the spawn time
+                    last_spawn_time = get_time();                };
+
+                // Check if the left arrow has been pressed
+                if key == Left {
+
+                    // Add a new car coming from the east
+                    all_cars.push(Car::new(Spawn::EAST,  car_id as u64));
+
+                    // Increment the car ID
+                    car_id +=1 as u64;
+
+                    // geting the spawn time
+                    last_spawn_time = get_time();                };
+
+                // implementing the 'r' key for spawning a vehicle from a random direction.
+                if key == R {
+                    let mut rng = thread_rng();
+                    let random_direction = rng.gen_range(0..4);
+                    let spawn_location = match random_direction {
+                        0 => Spawn::NORTH,
+                        1 => Spawn::WEST,
+                        2 => Spawn::SOUTH,
+                        _ => Spawn::EAST,
+                    };
+
+                    // Add a new car coming from the east
+                    all_cars.push(Car::new(spawn_location, car_id as u64));
+
+                    // Increment the car ID
+                    car_id += 1 as u64;
+
+                    // geting the spawn time
+                    last_spawn_time = get_time();
+                }
             }
         }
          
