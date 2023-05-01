@@ -118,7 +118,7 @@ async fn main() {
         if let Some(key) = get_last_key_pressed() {
             // Check if the up arrow has been pressed
             if get_time() - last_spawn_time_up >= spawn_throttle_time {
-            if key == Up {
+            if key == Down {
                 // Add a new car coming from the north
                 all_cars.push(Car::new(Spawn::NORTH, car_id as u64));
                 // Increment the car ID
@@ -130,7 +130,7 @@ async fn main() {
         }
             // Check if the down arrow has been pressed
             if get_time() - last_spawn_time_down >= spawn_throttle_time {
-            if key == Down {
+            if key == Up {
                 // Add a new car coming from the south
                 all_cars.push(Car::new(Spawn::SOUTH, car_id as u64));
                 // Increment the car ID
