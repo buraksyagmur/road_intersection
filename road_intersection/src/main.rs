@@ -1,7 +1,13 @@
 // Import the necessary modules.
+use crate::KeyCode::{Down, Enter, Escape, Left, Right, Up, R};
+use chrono::{DateTime, Duration, Local};
+use core::panic;
 use macroquad::prelude::*;
-use crate::KeyCode::{C, Down, Enter, Escape, Left, R, Right, Up};
-use r::{Rng, thread_rng};
+use macroquad::prelude::*;
+use macroquad::prelude::*;
+use r::{thread_rng, Rng};
+use std::thread;
+use std::thread::sleep;
 
 // Define an enumeration of possible directions.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -21,7 +27,7 @@ enum Colour {
 
 // Define an enumeration of possible spawn locations.
 #[derive(Clone, Debug, PartialEq)]
-enum Spawn{
+enum Spawn {
     EAST,
     WEST,
     NORTH,
@@ -32,7 +38,7 @@ enum Spawn{
 // Define a structure representing a traffic light.
 struct TrafficLight {
     color: Color,
-    position:Spawn,
+    position: Spawn,
 }
 
 // Define a structure representing the position of a car.
@@ -51,447 +57,732 @@ struct Car {
     direction: Direction,
     position: CarPosition,
     color: Color,
-    spawninglocation : Spawn,
-    passed_intersection : bool,
-    newdirection: Spawn,
+    spawninglocation: Spawn,
+    passed_intersection: bool,
+    newdirection: bool,
     wait: bool,
+    emergency_stop: bool,
+    where_are_you_from: Spawn,
+    passing_time: DateTime<Local>,
+    arrived: bool,
 }
-
 
 #[macroquad::main("Traffic Simulation Program Rust")]
 async fn main() {
-    let mut car_id: u64 = 0;// Initialize the ID for the cars
-    let mut check_car:usize= 0;// Initialize a variable to check if new cars have been added
-    let mut lights:Vec<Color> = vec![];// Create a vector to store the color of the traffic lights
-    let mut all_cars: Vec<Car> = vec![];// Create an empty vector to store all cars
-    let mut  newspan = Spawn::ALLGREEN;// Initialize the traffic light pattern
-    let mut all_traffic_lights : Vec<TrafficLight> = vec![];// Create an empty vector to store all traffic lights
-
-    let mut break_flag = false;
-
-    //This is a new variable to store the time of the last spawn:
-    let mut last_spawn_time = get_time();
-
-    // Here we create a threshold for the minimum time between spawns (to 0.5 seconds):
-    let spawn_throttle_time = 0.5;
-
-    lights.push(GREEN);// Add the green color to the top left trafic lights
-    lights.push(GREEN);// Add the green color to the top right trafic lights
-    lights.push(GREEN);//  Add the green color to the bottom right trafic lights
-    lights.push(GREEN);// Add the green color to the bottom left trafic lights
-
+    let screen_height = screen_height();
+    let screen_width = screen_width();
+    let road_width = screen_width * 0.2;
+    let added_value = road_width / 2.0;
+    let mut last_spawn_time_up = get_time();
+    let mut last_spawn_time_down = get_time();
+    let mut last_spawn_time_left = get_time();
+    let mut last_spawn_time_right = get_time();
+    let mut last_spawn_time_r = get_time();
+    let center_x = screen_width / 2.0;
+    let center_y = screen_height / 2.0;
+    let mut all_cars: Vec<Car> = vec![];
+    let mut all_traffic_lights: Vec<TrafficLight> = vec![];
+    let mut car_id: u64 = 0;
+    let mut check_car: usize = 0;
+    let mut newspan = Spawn::ALLGREEN;
+    let mut lights: Vec<Color> = vec![];
+    let mut first_iteration: bool = false;
+    lights.push(GREEN);
+    lights.push(GREEN);
+    lights.push(GREEN);
+    lights.push(GREEN);
     loop {
-        // Clear the background with a DARKBROWN color
-        clear_background(DARKBROWN);
-        
-        // Get the mouse position
+        clear_background(WHITE);
         let (mouse_x, mouse_y) = mouse_position();
+        draw_text(
+            format!("X: {}, Y:{}", mouse_x, mouse_y).as_str(),
+            mouse_x,
+            mouse_y,
+            15.0,
+            BLACK,
+        );
+        draw_text(
+            format!("X: {}, Y:{}", mouse_x, mouse_y).as_str(),
+            0.0,
+            0.0,
+            15.0,
+            BLACK,
+        );
+        road();
+        //This is a new variable to store the time of the last spawn:
 
-        // Draw the mouse position text
-        draw_text(format!("X: {}, Y:{}", mouse_x, mouse_y).as_str(), mouse_x, mouse_y, 25.0, BLACK);
-        
-        // Draw the mouse position text
-        draw_text(format!("X: {}, Y:{}", mouse_x, mouse_y).as_str(), 0.0, 0.0, 25.0, BLACK);
-        
-        road();// Draw the road
 
-        // Draw direction labels
-        draw_text("NORTH", 667.0, 50.0, 30.0, BLACK);
-        draw_text("SOUTH", 667.0, 750.0, 30.0, BLACK);
-        draw_text("WEST", 50.0, 506.0, 30.0, BLACK);
-        draw_text("EAST", 1200.0, 506.0, 30.0, BLACK);
+        // Here we create a threshold for the minimum time between spawns (to 0.5 seconds):
+        let spawn_throttle_time = 1.5;
 
+        if let Some(key) = get_last_key_pressed() {
+            // Check if the up arrow has been pressed
+            if get_time() - last_spawn_time_up >= spawn_throttle_time {
+            if key == Up {
+                // Add a new car coming from the north
+                all_cars.push(Car::new(Spawn::NORTH, car_id as u64));
+                // Increment the car ID
+                car_id += 1 as u64;
 
-        //  draw_rectangle(position.x, 420.0, 80.0, 80.0, YELLOW);
-
-        // Check for user input and spawn cars ensure that the minimum time between spawns is 0.5 seconds
-        //preventing spamming the creation of vehicles.
-        if get_time() - last_spawn_time >= spawn_throttle_time {
-            if let Some(key) = get_last_key_pressed() {
-
-                // Check if the up arrow has been pressed
-                if key == Up {
-
-                    // Add a new car coming from the north
-                    all_cars.push(Car::new(Spawn::NORTH,  car_id as u64));
-
-                    // Increment the car ID
-                    car_id +=1 as u64;
-                    
-                    // geting the spawn time
-                    last_spawn_time = get_time();
+                // geting the spawn time
+                last_spawn_time_up = get_time();
+            };
+        }
+            // Check if the down arrow has been pressed
+            if get_time() - last_spawn_time_down >= spawn_throttle_time {
+            if key == Down {
+                // Add a new car coming from the south
+                all_cars.push(Car::new(Spawn::SOUTH, car_id as u64));
+                // Increment the car ID
+                car_id += 1 as u64;
+                // geting the spawn time
+                last_spawn_time_down = get_time();
+            };
+        }
+            // Check if the right arrow has been pressed
+            if get_time() - last_spawn_time_right >= spawn_throttle_time {
+            if key == Right {
+                // Add a new car coming from the west
+                all_cars.push(Car::new(Spawn::WEST, car_id as u64));
+                // Increment the car ID
+                car_id += 1 as u64;
+                // geting the spawn time
+                last_spawn_time_right = get_time();
+            };
+        }
+            // Check if the left arrow has been pressed
+            if get_time() - last_spawn_time_left >= spawn_throttle_time {
+            if key == Left {
+                // Add a new car coming from the east
+                all_cars.push(Car::new(Spawn::EAST, car_id as u64));
+                // Increment the car ID
+                car_id += 1 as u64;
+                // geting the spawn time
+                last_spawn_time_left = get_time();
+            };
+        }
+            // implementing the 'r' key for spawning a vehicle from a random direction.
+            if get_time() - last_spawn_time_r >= spawn_throttle_time {
+            if key == R {
+                let mut rng = thread_rng();
+                let random_direction = rng.gen_range(0..4);
+                let spawn_location = match random_direction {
+                    0 => Spawn::NORTH,
+                    1 => Spawn::WEST,
+                    2 => Spawn::SOUTH,
+                    _ => Spawn::EAST,
                 };
-
-                // Check if the down arrow has been pressed
-                if key == Down {
-
-                    // Add a new car coming from the south
-                    all_cars.push(Car::new(Spawn::SOUTH,  car_id as u64));
-
-                    // Increment the car ID
-                    car_id +=1 as u64;
-
-                    // geting the spawn time
-                    last_spawn_time = get_time();
-                };
-
-                // Check if the right arrow has been pressed
-                if key == Right {
-
-                    // Add a new car coming from the west
-                    all_cars.push(Car::new(Spawn::WEST,  car_id as u64));
-
-                    // Increment the car ID
-                    car_id +=1 as u64;
-
-                    // geting the spawn time
-                    last_spawn_time = get_time();                };
-
-                // Check if the left arrow has been pressed
-                if key == Left {
-
-                    // Add a new car coming from the east
-                    all_cars.push(Car::new(Spawn::EAST,  car_id as u64));
-
-                    // Increment the car ID
-                    car_id +=1 as u64;
-
-                    // geting the spawn time
-                    last_spawn_time = get_time();                };
-
-                // implementing the 'r' key for spawning a vehicle from a random direction.
-                if key == R {
-                    let mut rng = thread_rng();
-                    let random_direction = rng.gen_range(0..4);
-                    let spawn_location = match random_direction {
-                        0 => Spawn::NORTH,
-                        1 => Spawn::WEST,
-                        2 => Spawn::SOUTH,
-                        _ => Spawn::EAST,
-                    };
-
-                    // Add a new car coming from the east
-                    all_cars.push(Car::new(spawn_location, car_id as u64));
-
-                    // Increment the car ID
-                    car_id += 1 as u64;
-
-                    // geting the spawn time
-                    last_spawn_time = get_time();
-                }
+                // Add a new car coming from the east
+                all_cars.push(Car::new(spawn_location, car_id as u64));
+                // Increment the car ID
+                car_id += 1 as u64;
+                // geting the spawn time
+                last_spawn_time_r = get_time();
             }
         }
-         
-        // Draw traffic lights
-        
-        // Draw the traffic light for the west direction (LEFT DRIVERS)
-        draw_circle(590.0, 590.0, 10.0, lights[3]);
-        
-        // Draw the traffic light for the south direction (RIGHT DRIVERS)
-        draw_circle(820.0, 390.0, 10.0, lights[1]);
-        
-        // Draw the traffic light for the east direction (BOTTOM DRIVERS)
-        draw_circle(810.0, 605.0, 10.0, lights[2]);
-        
-        // Draw the traffic light for the north direction (TOP DRIVERS)
-        draw_circle(590.0, 390.0, 10.0, lights[0]);
-
-        // Update traffic lights
-        if all_cars.len() > check_car{
-           (check_car,newspan) = trafficlights(&mut all_cars, check_car);
-           println!("newspan: {:?}", newspan);
-           if newspan == Spawn::NORTH{
-            lights[0] = GREEN;
-            lights[1] = RED;
-            lights[2] = RED;
-            lights[3] = RED;
-           }else if newspan == Spawn::WEST{
-            lights[0] = RED;
-            lights[1] = GREEN;
-            lights[2] = RED;
-            lights[3] = RED;
-           }else if newspan == Spawn::SOUTH{
-            lights[0] = RED;
-            lights[1] = RED;
-            lights[2] = GREEN;
-            lights[3] = RED;
-           }else if newspan == Spawn::EAST{
-            lights[0] = RED;
-            lights[1] = RED;
-            lights[2] = RED;
-            lights[3] = GREEN;
-           }
-           check_car +=1 as usize;
+            if key == Escape {
+                break;
+            }
         }
-        for mut onecar in all_cars.iter_mut(){
+        draw_line(
+            center_x - added_value,
+            center_y - added_value,
+            center_x,
+            center_y - added_value,
+            0.5,
+            lights[0],
+        );
+        draw_line(
+            center_x + added_value,
+            center_y,
+            center_x + added_value,
+            center_y - added_value,
+            0.5,
+            lights[1],
+        );
+        draw_line(
+            center_x,
+            center_y + added_value,
+            center_x + added_value,
+            center_y + added_value,
+            0.5,
+            lights[2],
+        );
+        draw_line(
+            center_x - added_value,
+            center_y + added_value,
+            center_x - added_value,
+            center_y,
+            0.5,
+            lights[3],
+        );
+        if all_cars.len() > check_car {
+            (check_car, newspan) = trafficlights(&mut all_cars, check_car);
+            println!("another: {:?}, newspan: {:?}", check_car, newspan);
+            if newspan == Spawn::NORTH {
+                lights[0] = GREEN;
+                lights[1] = RED;
+                lights[2] = RED;
+                lights[3] = RED;
+            } else if newspan == Spawn::WEST {
+                lights[0] = RED;
+                lights[1] = GREEN;
+                lights[2] = RED;
+                lights[3] = RED;
+            } else if newspan == Spawn::SOUTH {
+                lights[0] = RED;
+                lights[1] = RED;
+                lights[2] = GREEN;
+                lights[3] = RED;
+            } else if newspan == Spawn::EAST {
+                lights[0] = RED;
+                lights[1] = RED;
+                lights[2] = RED;
+                lights[3] = GREEN;
+            } else if newspan == Spawn::ALLGREEN {
+                lights[0] = GREEN;
+                lights[1] = GREEN;
+                lights[2] = GREEN;
+                lights[3] = GREEN;
+            }
+        }
+        for mut onecar in all_cars.iter_mut() {
+            if onecar.position.x > screen_width + added_value
+                || onecar.position.x < 0.0
+                || onecar.position.y > screen_height + added_value
+                || onecar.position.y < 0.0
+            {
+                onecar.arrived = true;
+            }
+        }
+        for mut onecar in all_cars.iter_mut() {
+            println!(
+                "firstiteration: {}, selectedcar: {:?}",
+                first_iteration, onecar
+            );
             if onecar.spawninglocation != newspan {
                 onecar.wait = true;
-            }else if newspan == Spawn::ALLGREEN {
+            } else {
                 onecar.wait = false;
-            }else {
+                onecar.emergency_stop = false;
+            }
+            if newspan == Spawn::ALLGREEN {
                 onecar.wait = false;
             }
         }
-        for onecar in all_cars.iter_mut(){
 
-                onecar.drive_car();
-
+        for i in 0..all_cars.len() {
+            for j in (i + 1)..all_cars.len() {
+                if i < j
+                    && all_cars[i].spawninglocation == all_cars[j].spawninglocation
+                    && (((all_cars[i].position.x - all_cars[j].position.x).abs()
+                        < (2.0 * added_value)
+                        && all_cars[i].position.y == all_cars[j].position.y)
+                        || ((all_cars[i].position.y - all_cars[j].position.y).abs()
+                            < (2.0 * added_value)
+                            && all_cars[i].position.x == all_cars[j].position.x))
+                {
+                    println!("reason: {:?}", all_cars[i]);
+                    println!("stopped: {:?}", all_cars[j]);
+                    all_cars[j].emergency_stop = true;
+                }
+            }
         }
-        //condition to check if the 'Esc' key is pressed:
-        if is_key_pressed(KeyCode::Escape) {
-            break_flag = true;
-            break;
+        for i in 0..all_cars.len() {
+            for j in (i + 1)..all_cars.len() {
+                if i < j
+                    && !all_cars[i].arrived
+                    && all_cars[i].spawninglocation == all_cars[j].spawninglocation
+                    && all_cars[i].wait == false
+                    && all_cars[j].wait == false
+                {
+                    if i + 1 as usize != j {
+                        all_cars[j].wait = true;
+                    }
+                }
+            }
+        }
+        // for i in 0..all_cars.len() {
+        //     for j in (i + 1)..all_cars.len() {
+        //         let time_diff: Duration = all_cars[j].passing_time.signed_duration_since(all_cars[i].passing_time);
+        //         if i < j
+        //             && all_cars[i].where_are_you_from == all_cars[j].where_are_you_from
+        //             && all_cars[i].wait == false
+        //             && all_cars[j].wait == true && time_diff.num_seconds() > 3 as i64
+        //         {
+        //             all_cars[j].wait = false;
+        //         }
+        //     }
+        // }
+        for mut onecar in all_cars.iter_mut() {
+            onecar.drive_car();
         }
 
-        next_frame().await;
+        next_frame().await
     }
-    //This condition checks if the break_flag is true, and break the main function as (ESCAPE):
-    if break_flag {
-        return;
-    }
-    
-    next_frame().await
 }
-
-fn road(){
-    let screen_width = screen_width();
+fn road() {
     let screen_height = screen_height();
-    
-    {
-        // center -> up
-        draw_line(620.0, 0.0, 620.0, 420.0, 1.0, YELLOW);//top left line
-        draw_line(700.0, 0.0, 700.0, 420.0, 1.0, WHITE);//top middle line
-        draw_line(780.0, 0.0, 780.0, 420.0, 1.0, YELLOW);// top right line
-    }
-   
-    {
-        // center -> down
-        draw_line(620.0, 580.0, 620.0, screen_height, 1.0, RED);//bottom left line
-        draw_line(700.0, 580.0, 700.0, screen_height, 1.0, WHITE);//bottom middle line
-        draw_line(780.0, 580.0, 780.0, screen_height, 1.0, RED);// bottom right line
-    }    
-    
-    {
-        // center -> left
-        draw_line(0.0, 420.0, 620.0, 420.0, 1.0, BLUE);//upper-left line
-        draw_line(0.0, 500.0, 620.0, 500.0, 1.0, WHITE);//middle-left line
-        draw_line(0.0, 580.0, 620.0, 580.0, 1.0, BLUE);//bottom-left line
-    }
+    let screen_width = screen_width();
+
+    let road_width = screen_width * 0.2;
+    let added_value = road_width / 2.0;
+
+    let center_x = screen_width / 2.0;
+    let center_y = screen_height / 2.0;
 
     {
-        // center -> right
-        draw_line(780.0, 420.0, screen_width, 420.0, 1.0, GREEN);// upper-right line
-        draw_line(780.0, 500.0, screen_width, 500.0, 1.0, WHITE);// middle-right line
-        draw_line(780.0, 580.0, screen_width, 580.0, 1.0, GREEN);// bottom-right line
+        draw_line(
+            center_x + added_value,
+            0.0,
+            center_x + added_value,
+            center_y - added_value,
+            1.0,
+            GRAY,
+        );
+        draw_line(center_x, 0.0, center_x, center_y - added_value, 1.0, GRAY);
+        draw_line(
+            center_x - added_value,
+            0.0,
+            center_x - added_value,
+            center_y - added_value,
+            1.0,
+            GRAY,
+        );
     }
     {
-        //  draw a rectangle for the road color (top to bottom)
-        draw_rectangle(620.0, 0.0, 780.0 - 620.0, screen_height, Color::new(0.0, 0.4, 0.4, 0.2)); //top to bottom road color
-        //  draw a rectangle for the road color (sideways)
-        draw_rectangle(0.0, 580.0, screen_width, 460.0 - 620.0, Color::new(0.0, 0.4, 0.4, 0.2)); //left to left road color
+        draw_line(
+            center_x + added_value,
+            center_y + added_value,
+            center_x + added_value,
+            screen_height,
+            1.0,
+            GRAY,
+        );
+        draw_line(
+            center_x,
+            center_y + added_value,
+            center_x,
+            screen_height,
+            1.0,
+            GRAY,
+        );
+        draw_line(
+            center_x - added_value,
+            center_y + added_value,
+            center_x - added_value,
+            screen_height,
+            1.0,
+            GRAY,
+        );
+    }
+    {
+        draw_line(
+            0.0,
+            center_y + added_value,
+            center_x - added_value,
+            center_y + added_value,
+            1.0,
+            GRAY,
+        );
+        draw_line(0.0, center_y, center_x - added_value, center_y, 1.0, GRAY);
+        draw_line(
+            0.0,
+            center_y - added_value,
+            center_x - added_value,
+            center_y - added_value,
+            1.0,
+            GRAY,
+        );
+    }
+    {
+        draw_line(
+            center_x + added_value,
+            center_y + added_value,
+            screen_width,
+            center_y + added_value,
+            1.0,
+            GRAY,
+        );
+        draw_line(
+            center_x + added_value,
+            center_y,
+            screen_width,
+            center_y,
+            1.0,
+            GRAY,
+        );
+        draw_line(
+            center_x + added_value,
+            center_y - added_value,
+            screen_width,
+            center_y - added_value,
+            1.0,
+            GRAY,
+        );
     }
 }
-
-// Define a struct named "Car"
 impl Car {
-    
-    // Define a new constructor function for the "Car" struct
-    pub fn new(spawninglocation:Spawn, car_id:u64 ) -> Car {
-        // Create a new random number generator
+    pub fn new(spawninglocation: Spawn, car_id: u64) -> Car {
+        let screen_height = screen_height();
+        let screen_width = screen_width();
+        let road_width = screen_width * 0.2;
+        let added_value = road_width / 2.0;
+        let center_x = screen_width / 2.0;
+        let center_y = screen_height / 2.0;
         let mut rng = thread_rng();
-        // Generate a random number between 0 and 2 (inclusive)
         let selected_colour = match rng.gen_range(0..3) {
-            // If the random number is 0, set the color to red
-            0 => { Colour::RED }
-            // If the random number is 1, set the color to blue
-            1 => { Colour::BLUE }
-            // If the random number is 2, set the color to green
-            2 => { Colour::GREEN }
-            // This branch should never be reached, but it's included to make the compiler happy
-            _ => { Colour::GREEN }
+            0 => Colour::RED,
+            1 => Colour::BLUE,
+            2 => Colour::GREEN,
+            _ => Colour::GREEN,
         };
-        
-        // Define a variable named "color"
         let color: Color;
-        
-        // Set the "color" variable based on the selected color
         match selected_colour {
-            Colour::RED  => {color = RED}
-            Colour::BLUE  => {color = BLUE}
-            Colour::GREEN  => {color = GREEN}
+            Colour::RED => color = RED,
+            Colour::BLUE => color = BLUE,
+            Colour::GREEN => color = GREEN,
         }
-        
-        // Define a variable named "direction"
         let direction = match selected_colour {
-            // If the selected color is red, set the direction to left
-            Colour::RED  => {Direction::LEFT}
-            // If the selected color is blue, set the direction to right
-            Colour::BLUE  => {Direction::RIGHT}
-            // If the selected color is green, set the direction to straight
-            Colour::GREEN  => {Direction::STRAIGHT}
+            Colour::RED => Direction::LEFT,
+            Colour::BLUE => Direction::RIGHT,
+            Colour::GREEN => Direction::STRAIGHT,
         };
-        
-        // Define variables named "x" and "y" (WHICH IS USED TO KEEP THE CAR IN THE CENTRE OF THE ROAD)
         let (x, y) = match spawninglocation {
-            // If the spawning location is north, set the x and y coordinates accordingly
-            Spawn::NORTH => { (625.0, ( 00.0)) }
-            // If the spawning location is south, set the x and y coordinates accordingly
-            Spawn::SOUTH=> { (705.0, screen_height()-10.0) }
-            // If the spawning location is west, set the x and y coordinates accordingly
-            Spawn::WEST => { ((screen_width()-10.0 ), 425.0 /*y: ((screen_height * 0.65 - screen_height / 2.0) / 2.0 + screen_height / 2.0) - (screen_height / 16.0) / 2.0*/) }
-            // If the spawning location is east, set the x and y coordinates accordingly
-            Spawn::EAST => { (0.0, 505.0) }
-            // If the spawning location is all green, set the x and y coordinates to (0, 0)
-            Spawn::ALLGREEN => (0.0, 0.0)
+            Spawn::NORTH => (center_x - added_value, 0.0),
+            Spawn::SOUTH => (center_x, screen_height),
+            Spawn::WEST => (screen_width - added_value, center_y - added_value),
+            Spawn::EAST => (0.0, center_y),
+            Spawn::ALLGREEN => (0.0, 0.0),
         };
-        
-        // Create a new Car object with the given properties
+        let now = Local::now();
+        let clonespawn = spawninglocation.clone();
         let xnewcar = Car {
-            id : car_id,
-            height: 70.0,
-            width: 70.0,
+            id: car_id,
+            height: added_value,
+            width: added_value,
             spawninglocation,
             direction,
-            position: CarPosition{x,y},
+            position: CarPosition { x, y },
             color,
             passed_intersection: false,
-            newdirection: Spawn::EAST,
-            wait:false,
+            newdirection: false,
+            wait: false,
+            emergency_stop: false,
+            where_are_you_from: clonespawn,
+            passing_time: now,
+            arrived: false,
         };
-        
-        // Print the new car's properties for debugging purposes
-        println!("{:?}", xnewcar);
-        
-        // Return the new car object
         return xnewcar;
-
-        // Car {
-        //     id : car_id,
-        //     height: 80.0,
-        //     width: 80.0,
-        //     spawninglocation,
-        //     direction:Direction::UP, // change this
-        //     position: CarPosition{x,y},
-        //     color,
-        // }
     }
-    
     fn drive_car(&mut self) {
-            
-        // Draw rectangle using the car's position, width, height, and color
-        draw_rectangle(self.position.x, self.position.y, self.width, self.height, self.color);
-            
-        // println!("drawcar: {},{},{},{},{:?}", self.position.x, self.position.y, self.width, self.height, self.color);
-        // self.turn();
-            
-        // Check if the car is waiting at a specific location before moving
-        if self.wait && self.spawninglocation == Spawn::EAST && self.position.x == 540.00 {
-            // Do nothing if the car is waiting at this location
-        } else if self.wait && self.spawninglocation == Spawn::WEST && self.position.x == 780.00 {
-            // Do nothing if the car is waiting at this location
-        } else if self.wait && self.spawninglocation == Spawn::NORTH && self.position.y == 340.00 {
-           // Do nothing if the car is waiting at this location
-        } else if self.wait && self.spawninglocation == Spawn::SOUTH && self.position.y == 580.00 {
-          // Do nothing if the car is waiting at this location
+        let screen_height = screen_height();
+        let screen_width = screen_width();
+        let road_width = screen_width * 0.2;
+        let added_value = road_width / 2.0;
+        let center_x = screen_width / 2.0;
+        let center_y = screen_height / 2.0;
+        let velo: f32 = 2.0;
+        let wait_dur = (added_value / velo) as u64;
+
+        draw_rectangle(
+            self.position.x,
+            self.position.y,
+            self.width,
+            self.height,
+            self.color,
+        );
+
+        if self.wait
+            && self.spawninglocation == Spawn::EAST
+            && self.position.x == center_x - (2.5 * added_value)
+            && !self.newdirection
+        {
+        } else if self.wait
+            && self.spawninglocation == Spawn::WEST
+            && self.position.x == center_x + (1.5 * added_value)
+            && !self.newdirection
+        {
+        } else if self.wait
+            && self.spawninglocation == Spawn::NORTH
+            && self.position.y == center_y - (2.5 * added_value)
+            && !self.newdirection
+        {
+        } else if self.wait
+            && self.spawninglocation == Spawn::SOUTH
+            && self.position.y == center_y + (1.5 * added_value)
+            && !self.newdirection
+        {
+        } else if self.emergency_stop {
         } else {
-            // Move the car based on its spawning location, position, and color
             if self.spawninglocation == Spawn::EAST {
-                if self.position.x == 699.0 && self.position.y == 500.0 && !self.passed_intersection && self.color == RED {
-                    // Update the car's spawning location and passed intersection flag
+                if self.newdirection
+                    && !self.passed_intersection
+                    && self.position.x == center_x - (2.0 * added_value)
+                {
                     self.passed_intersection = true;
-                    self.spawninglocation = Spawn::SOUTH;
-                } else if self.position.x == 619.0 && self.position.y == 500.0 && !self.passed_intersection && self.color == BLUE {
-                    // Update the car's spawning location and passed intersection flag
+                    self.passing_time = Local::now();
+                }
+                if self.newdirection
+                    && !self.passed_intersection
+                    && self.position.x == center_x + (2.0 * added_value)
+                {
+                    self.passed_intersection = true;
+                    self.passing_time = Local::now();
+                }
+                if self.position.x == center_x && !self.passed_intersection && !self.newdirection {
+                    if self.color == RED {
+                        self.spawninglocation = Spawn::SOUTH;
+                        self.newdirection = true;
+                    } else if self.color == GREEN && !self.newdirection {
+                        self.newdirection = true;
+                    }
+                } else if self.position.x == center_x - added_value
+                    && !self.passed_intersection
+                    && self.color == BLUE
+                {
                     self.spawninglocation = Spawn::NORTH;
                     self.passed_intersection = true;
+                    self.passing_time = Local::now();
+                } else {
+                    self.position.x += velo;
                 }
-                // Move the car to the right
-                self.position.x += 10.0;
             }
             if self.spawninglocation == Spawn::WEST {
-                if self.position.x == 621.0 && self.position.y == 420.0 && !self.passed_intersection && self.color == RED {
-                    // Update the car's spawning location and passed intersection flag
+                if self.newdirection
+                    && !self.passed_intersection
+                    && self.position.x == center_x - (2.0 * added_value)
+                {
                     self.passed_intersection = true;
-                    self.spawninglocation = Spawn::NORTH;
-                } else if self.position.x == 701.0 && self.position.y == 420.0 && !self.passed_intersection && self.color == BLUE {
-                    // Update the car's spawning location and passed intersection flag
+                    self.passing_time = Local::now();
+                }
+                if self.newdirection
+                    && !self.passed_intersection
+                    && self.position.x == center_x + (2.0 * added_value)
+                {
+                    self.passed_intersection = true;
+                    self.passing_time = Local::now();
+                }
+                if self.position.x == center_x - added_value
+                    && !self.passed_intersection
+                    && !self.newdirection
+                {
+                    if self.color == RED {
+                        self.spawninglocation = Spawn::NORTH;
+                        self.newdirection = true;
+                    } else if self.color == GREEN && !self.newdirection {
+                        self.newdirection = true;
+                    }
+                } else if self.position.x == center_x
+                    && !self.passed_intersection
+                    && self.color == BLUE
+                {
                     self.spawninglocation = Spawn::SOUTH;
                     self.passed_intersection = true;
+                    self.passing_time = Local::now();
+                } else {
+                    self.position.x -= velo;
                 }
-                // Move the car to the left
-                self.position.x -= 10.0;
             }
-            
             if self.spawninglocation == Spawn::NORTH {
-                if self.position.x == 620.0 && self.position.y == 499.0 && !self.passed_intersection && self.color == RED {
-                    // Update the car's spawning location and passed intersection flag
+                if self.newdirection
+                    && !self.passed_intersection
+                    && self.position.y == center_y + (2.0 * added_value)
+                {
                     self.passed_intersection = true;
-                    self.spawninglocation = Spawn::EAST;
-                
-                } else if self.position.x == 620.0 && self.position.y == 419.0 && !self.passed_intersection && self.color == BLUE {
-                    // Update the car's spawning location and passed intersection flag
+                    self.passing_time = Local::now();
+                }
+                if self.newdirection
+                    && !self.passed_intersection
+                    && self.position.y == center_y - (2.0 * added_value)
+                {
+                    self.passed_intersection = true;
+                    self.passing_time = Local::now();
+                }
+                if self.position.y == center_y && !self.passed_intersection && !self.newdirection {
+                    if self.color == RED {
+                        self.spawninglocation = Spawn::EAST;
+                        self.newdirection = true;
+                    } else if self.color == GREEN && !self.newdirection {
+                        self.newdirection = true;
+                    } else if self.color == RED && self.newdirection {
+                    }
+                } else if self.position.y == center_y - added_value
+                    && !self.passed_intersection
+                    && self.color == BLUE
+                {
                     self.spawninglocation = Spawn::WEST;
                     self.passed_intersection = true;
+                    self.passing_time = Local::now();
+                } else {
+                    self.position.y += velo;
                 }
-                // Move the car up
-                self.position.y += 10.0;
             }
-            
             if self.spawninglocation == Spawn::SOUTH {
-                // Check if the car is at the intersection, has not passed it, and has the correct color.
-                if self.position.x==700.0 && self.position.y == 421.0 && !self.passed_intersection && self.color == RED{
-                    // If the car meets the above conditions, mark that it has passed the intersection and change its direction to West.
+                if self.newdirection
+                    && self.position.y == center_y - (2.0 * added_value)
+                    && !self.passed_intersection
+                {
                     self.passed_intersection = true;
-                    self.spawninglocation = Spawn::WEST;
-                } else if self.position.x==700.0 && self.position.y == 501.0 && !self.passed_intersection && self.color == BLUE {
-                    // If the car meets the above conditions, mark that it has passed the intersection and change its direction to East.
+                    self.passing_time = Local::now();
+                }
+                if self.newdirection
+                    && self.position.y == center_y + (2.0 * added_value)
+                    && !self.passed_intersection
+                {
+                    self.passed_intersection = true;
+                    self.passing_time = Local::now();
+                }
+                if self.position.y == center_y - added_value
+                    && !self.passed_intersection
+                    && !self.newdirection
+                {
+                    if self.color == RED {
+                        self.spawninglocation = Spawn::WEST;
+                        self.newdirection = true;
+                    } else if self.color == GREEN && !self.newdirection {
+                        self.newdirection = true;
+                    } else if self.color == RED && self.newdirection {
+                    }
+                } else if self.position.y == center_y
+                    && !self.passed_intersection
+                    && self.color == BLUE
+                {
                     self.spawninglocation = Spawn::EAST;
                     self.passed_intersection = true;
+                    self.passing_time = Local::now();
+                } else {
+                    self.position.y -= velo;
                 }
-                // Move the car 10 units in the negative y-direction (south).
-                self.position.y -= 10.0;
             }
         }
     }
 }
+fn trafficlights(all_cars: &mut Vec<Car>, mut checkcar: usize) -> (usize, Spawn) {
+    let screen_height = screen_height();
+    let screen_width = screen_width();
+    let road_width = screen_width * 0.2;
+    let added_value = road_width / 2.0;
+    let center_x = screen_width / 2.0;
+    let center_y = screen_height / 2.0;
 
-// This function updates the traffic lights and returns a tuple with the index of 
-// the next car to be processed and the current spawning location.
-fn trafficlights(all_cars: &mut Vec<Car>,mut checkcar: usize) -> (usize, Spawn){
-    // Print the length of the all_cars vector and the index of the current car being processed.
-    println!("allcar len: {}, checkcar: {}",all_cars.len(), checkcar);
-        
-    // Print the current car being processed.
-    println!("{:?}",all_cars[checkcar]);
-        
-    // If the current car has passed the intersection, move to the next car and set the 
-    // traffic lights to all green.
+    let center_x = screen_width / 2.0;
+    let center_y = screen_height / 2.0;
+    println!("problem:{:?}, id:{}", all_cars[checkcar], checkcar);
     if all_cars[checkcar].passed_intersection == true {
-        checkcar+=1 as usize;
-        (checkcar, Spawn::ALLGREEN)
-    }else {
-        
-        // Otherwise, set the traffic lights according to the current car's spawning location.
-        draw_circle(590.0, 590.0, 10.0, RED);
-        draw_circle(820.0, 390.0, 10.0, RED);
-        draw_circle(810.0, 605.0, 10.0, RED);
-        draw_circle(590.0, 390.0, 10.0, RED);
-            
-        match all_cars[checkcar].spawninglocation  {
-            Spawn::NORTH => {draw_circle(590.0, 390.0, 10.0, GREEN)},
-            Spawn::SOUTH=> {draw_circle(810.0, 605.0, 10.0, GREEN)},
-            Spawn::WEST =>{draw_circle(820.0, 390.0, 10.0, GREEN)},
-            Spawn::EAST => {draw_circle(590.0, 590.0, 10.0, GREEN)},
-            Spawn::ALLGREEN => {draw_circle(100.0, 100.0, 10.0, GREEN);
-                draw_circle(130.0, 100.0, 10.0, GREEN);
-                draw_circle(160.0, 100.0, 10.0, GREEN);
-                draw_circle(190.0, 100.0, 10.0, GREEN)
-            },
-        };
-            
-        //    checkcar +=1 as  usize;
-        // Return the index of the current car and the current spawning location.
-        (checkcar, all_cars[checkcar].spawninglocation.clone())
-    }   
-}
+        checkcar += 1 as usize;
+    }
+    if checkcar as usize == all_cars.len() {
+        return (checkcar, Spawn::ALLGREEN);
+    }
+    draw_line(
+        center_x - added_value,
+        center_y - added_value,
+        center_x,
+        center_y - added_value,
+        0.5,
+        RED,
+    );
+    draw_line(
+        center_x + added_value,
+        center_y,
+        center_x + added_value,
+        center_y - added_value,
+        0.5,
+        RED,
+    );
+    draw_line(
+        center_x,
+        center_y + added_value,
+        center_x + added_value,
+        center_y + added_value,
+        0.5,
+        RED,
+    );
+    draw_line(
+        center_x - added_value,
+        center_y + added_value,
+        center_x - added_value,
+        center_y,
+        0.5,
+        RED,
+    );
+    match all_cars[checkcar].spawninglocation {
+        Spawn::NORTH => {
+            draw_line(
+                center_x - added_value,
+                center_y - added_value,
+                center_x,
+                center_y - added_value,
+                0.5,
+                GREEN,
+            );
+        }
+        Spawn::SOUTH => {
+            draw_line(
+                center_x,
+                center_y + added_value,
+                center_x + added_value,
+                center_y + added_value,
+                0.5,
+                GREEN,
+            );
+        }
+        Spawn::WEST => {
+            draw_line(
+                center_x + added_value,
+                center_y,
+                center_x + added_value,
+                center_y - added_value,
+                0.5,
+                GREEN,
+            );
+        }
+        Spawn::EAST => {
+            draw_line(
+                center_x - added_value,
+                center_y + added_value,
+                center_x - added_value,
+                center_y,
+                0.5,
+                GREEN,
+            );
+        }
+        Spawn::ALLGREEN => {
+            draw_line(
+                center_x - added_value,
+                center_y - added_value,
+                center_x,
+                center_y - added_value,
+                0.5,
+                GREEN,
+            );
+            draw_line(
+                center_x + added_value,
+                center_y,
+                center_x + added_value,
+                center_y - added_value,
+                0.5,
+                GREEN,
+            );
+            draw_line(
+                center_x,
+                center_y + added_value,
+                center_x + added_value,
+                center_y + added_value,
+                0.5,
+                GREEN,
+            );
+            draw_line(
+                center_x - added_value,
+                center_y + added_value,
+                center_x - added_value,
+                center_y,
+                0.5,
+                GREEN,
+            );
+        }
+    };
 
+    (checkcar, all_cars[checkcar].spawninglocation.clone())
+}
