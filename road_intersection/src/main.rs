@@ -1,8 +1,11 @@
 // Import the necessary modules.
+use macroquad::prelude::*;
+// use macroquad::window::{self, Conf, Window};
+// use macroquad::window::is_window_ready;
+use macroquad::Window;
 use crate::KeyCode::{Down, Enter, Escape, Left, Right, Up, R};
 use chrono::{DateTime, Duration, Local};
 use core::panic;
-use macroquad::prelude::*;
 use macroquad::prelude::*;
 use macroquad::prelude::*;
 use r::{thread_rng, Rng};
@@ -66,11 +69,22 @@ struct Car {
     passing_time: DateTime<Local>,
     arrived: bool,
 }
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Road intersection".to_owned(),
+        // window_height: 1600,
+        window_resizable: false,
+        ..Default::default()
+    }
+}
 
-#[macroquad::main("Traffic Simulation Program Rust")]
+#[macroquad::main(window_conf)]
 async fn main() {
+    let mut paused = false;
+    let mut pause_start_time = 0.0;
     let screen_height = screen_height();
     let screen_width = screen_width();
+    println!("height{}, width {}", screen_height, screen_width);
     let road_width = screen_width * 0.2;
     let added_value = road_width / 2.0;
     let mut last_spawn_time_up = get_time();
@@ -91,9 +105,16 @@ async fn main() {
     lights.push(GREEN);
     lights.push(GREEN);
     lights.push(GREEN);
+    // let handle = next_frame().await;
+    // let is_ready = is_fullscreen();
+    // if is_ready {
+    //     // Do something
+    // }
+    // handle.await;
+    // let _window = macroquad::Window::new("My App", window_conf);
     loop {
         clear_background(WHITE);
-        let (mouse_x, mouse_y) = mouse_position();
+       if !paused{ let (mouse_x, mouse_y) = mouse_position();
         draw_text(
             format!("X: {}, Y:{}", mouse_x, mouse_y).as_str(),
             mouse_x,
@@ -113,7 +134,7 @@ async fn main() {
 
 
         // Here we create a threshold for the minimum time between spawns (to 0.5 seconds):
-        let spawn_throttle_time = 1.5;
+        let spawn_throttle_time = 3.0;
 
         if let Some(key) = get_last_key_pressed() {
             // Check if the up arrow has been pressed
@@ -143,7 +164,7 @@ async fn main() {
             if get_time() - last_spawn_time_right >= spawn_throttle_time {
             if key == Right {
                 // Add a new car coming from the west
-                all_cars.push(Car::new(Spawn::WEST, car_id as u64));
+                all_cars.push(Car::new(Spawn::EAST, car_id as u64));
                 // Increment the car ID
                 car_id += 1 as u64;
                 // geting the spawn time
@@ -154,7 +175,7 @@ async fn main() {
             if get_time() - last_spawn_time_left >= spawn_throttle_time {
             if key == Left {
                 // Add a new car coming from the east
-                all_cars.push(Car::new(Spawn::EAST, car_id as u64));
+                all_cars.push(Car::new(Spawn::WEST, car_id as u64));
                 // Increment the car ID
                 car_id += 1 as u64;
                 // geting the spawn time
@@ -182,6 +203,10 @@ async fn main() {
         }
             if key == Escape {
                 break;
+            }
+            if is_key_pressed(KeyCode::P) {
+                paused = true;
+                pause_start_time = get_time();
             }
         }
         draw_line(
@@ -314,10 +339,16 @@ async fn main() {
         //         }
         //     }
         // }
+
         for mut onecar in all_cars.iter_mut() {
             onecar.drive_car();
-        }
+        }}else{
+            draw_text("Paused", center_x, center_y, 32.0, Color::new(1.0, 1.0, 1.0, 1.0));
 
+            if is_key_pressed(KeyCode::C) {
+                paused = false;
+            }
+        }
         next_frame().await
     }
 }
@@ -482,7 +513,7 @@ impl Car {
         let added_value = road_width / 2.0;
         let center_x = screen_width / 2.0;
         let center_y = screen_height / 2.0;
-        let velo: f32 = 2.0;
+        let velo: f32 = 4.0;
         let wait_dur = (added_value / velo) as u64;
 
         draw_rectangle(
