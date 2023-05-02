@@ -71,8 +71,10 @@ struct Car {
 }
 fn window_conf() -> Conf {
     Conf {
-        window_title: "Road intersection".to_owned(),
-        // window_height: 1600,
+        window_title: "Traffic Simulation Program Rust".to_owned(),
+        // window_height: 920,
+        // window_width: 1470,
+        // fullscreen:true,
         window_resizable: false,
         ..Default::default()
     }
@@ -82,18 +84,11 @@ fn window_conf() -> Conf {
 async fn main() {
     let mut paused = false;
     let mut pause_start_time = 0.0;
-    let screen_height = screen_height();
-    let screen_width = screen_width();
-    println!("height{}, width {}", screen_height, screen_width);
-    let road_width = screen_width * 0.2;
-    let added_value = road_width / 2.0;
     let mut last_spawn_time_up = get_time();
     let mut last_spawn_time_down = get_time();
     let mut last_spawn_time_left = get_time();
     let mut last_spawn_time_right = get_time();
     let mut last_spawn_time_r = get_time();
-    let center_x = screen_width / 2.0;
-    let center_y = screen_height / 2.0;
     let mut all_cars: Vec<Car> = vec![];
     let mut all_traffic_lights: Vec<TrafficLight> = vec![];
     let mut car_id: u64 = 0;
@@ -114,7 +109,16 @@ async fn main() {
     // let _window = macroquad::Window::new("My App", window_conf);
     loop {
         clear_background(WHITE);
+
+        let screen_height = screen_height();
+        let screen_width = screen_width();
+        println!("height{}, width {}", screen_height, screen_width);
+        let road_width = screen_width * 0.1;
+        let added_value = road_width / 2.0;
+        let center_x = screen_width / 2.0;
+        let center_y = screen_height / 2.0;
        if !paused{ let (mouse_x, mouse_y) = mouse_position();
+
         draw_text(
             format!("X: {}, Y:{}", mouse_x, mouse_y).as_str(),
             mouse_x,
@@ -130,11 +134,19 @@ async fn main() {
             BLACK,
         );
         road();
+        draw_text("NORTH", center_x-added_value, 0.0+ added_value, 30.0, BLACK);
+        draw_text("SOUTH", center_x, screen_height, 30.0, BLACK);
+        draw_text("WEST", screen_width-(2.0*added_value), center_y, 30.0, BLACK);
+        draw_text("EAST", 0.0, center_y, 30.0, BLACK);
+
+        draw_text("RED - TURN LEFT",added_value, center_y+ (4.0*added_value), 20.0, RED);
+        draw_text("BLUE - TURN RIGHT", added_value, center_y+ (3.0*added_value), 20.0, BLUE);
+        draw_text("GREEN - GO STRAIGHT", added_value, center_y + (2.0*added_value), 20.0, GREEN);
         //This is a new variable to store the time of the last spawn:
 
 
         // Here we create a threshold for the minimum time between spawns (to 0.5 seconds):
-        let spawn_throttle_time = 3.0;
+        let spawn_throttle_time = 1.5;
 
         if let Some(key) = get_last_key_pressed() {
             // Check if the up arrow has been pressed
@@ -209,38 +221,38 @@ async fn main() {
                 pause_start_time = get_time();
             }
         }
-        draw_line(
-            center_x - added_value,
-            center_y - added_value,
-            center_x,
-            center_y - added_value,
-            0.5,
-            lights[0],
-        );
-        draw_line(
-            center_x + added_value,
-            center_y,
-            center_x + added_value,
-            center_y - added_value,
-            0.5,
-            lights[1],
-        );
-        draw_line(
-            center_x,
-            center_y + added_value,
-            center_x + added_value,
-            center_y + added_value,
-            0.5,
-            lights[2],
-        );
-        draw_line(
-            center_x - added_value,
-            center_y + added_value,
-            center_x - added_value,
-            center_y,
-            0.5,
-            lights[3],
-        );
+        // draw_line(
+        //     center_x - added_value,
+        //     center_y - added_value,
+        //     center_x,
+        //     center_y - added_value,
+        //     0.5,
+        //     lights[0],
+        // );
+        // draw_line(
+        //     center_x + added_value,
+        //     center_y,
+        //     center_x + added_value,
+        //     center_y - added_value,
+        //     0.5,
+        //     lights[1],
+        // );
+        // draw_line(
+        //     center_x,
+        //     center_y + added_value,
+        //     center_x + added_value,
+        //     center_y + added_value,
+        //     0.5,
+        //     lights[2],
+        // );
+        // draw_line(
+        //     center_x - added_value,
+        //     center_y + added_value,
+        //     center_x - added_value,
+        //     center_y,
+        //     0.5,
+        //     lights[3],
+        // );
         if all_cars.len() > check_car {
             (check_car, newspan) = trafficlights(&mut all_cars, check_car);
             println!("another: {:?}, newspan: {:?}", check_car, newspan);
@@ -356,7 +368,7 @@ fn road() {
     let screen_height = screen_height();
     let screen_width = screen_width();
 
-    let road_width = screen_width * 0.2;
+    let road_width = screen_width * 0.1;
     let added_value = road_width / 2.0;
 
     let center_x = screen_width / 2.0;
@@ -457,7 +469,7 @@ impl Car {
     pub fn new(spawninglocation: Spawn, car_id: u64) -> Car {
         let screen_height = screen_height();
         let screen_width = screen_width();
-        let road_width = screen_width * 0.2;
+        let road_width = screen_width * 0.1;
         let added_value = road_width / 2.0;
         let center_x = screen_width / 2.0;
         let center_y = screen_height / 2.0;
@@ -509,7 +521,7 @@ impl Car {
     fn drive_car(&mut self) {
         let screen_height = screen_height();
         let screen_width = screen_width();
-        let road_width = screen_width * 0.2;
+        let road_width = screen_width * 0.1;
         let added_value = road_width / 2.0;
         let center_x = screen_width / 2.0;
         let center_y = screen_height / 2.0;
@@ -692,7 +704,7 @@ impl Car {
 fn trafficlights(all_cars: &mut Vec<Car>, mut checkcar: usize) -> (usize, Spawn) {
     let screen_height = screen_height();
     let screen_width = screen_width();
-    let road_width = screen_width * 0.2;
+    let road_width = screen_width * 0.1;
     let added_value = road_width / 2.0;
     let center_x = screen_width / 2.0;
     let center_y = screen_height / 2.0;
